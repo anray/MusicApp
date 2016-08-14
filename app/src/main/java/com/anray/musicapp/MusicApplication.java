@@ -2,8 +2,6 @@ package com.anray.musicapp;
 
 import android.app.Application;
 import android.content.Context;
-import android.util.Log;
-import android.widget.Toast;
 
 import com.anray.musicapp.data.storage.models.DaoMaster;
 import com.anray.musicapp.data.storage.models.DaoSession;
@@ -18,9 +16,7 @@ public class MusicApplication extends Application {
 
     private static Context sContext;
 
-    private DaoSession sDaoSession;
-
-
+    private static DaoSession sDaoSession;
 
 
     public static Context getContext() {
@@ -39,5 +35,9 @@ public class MusicApplication extends Application {
 
         Stetho.initializeWithDefaults(sContext);
 
+    }
+
+    public static DaoSession getDaoSession() {
+        return sDaoSession;
     }
 }

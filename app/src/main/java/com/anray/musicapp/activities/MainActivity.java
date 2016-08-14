@@ -4,13 +4,14 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.drawable.BitmapDrawable;
-import android.media.AudioManager;
 import android.media.MediaMetadataRetriever;
-import android.media.MediaPlayer;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
@@ -19,7 +20,9 @@ import android.widget.Toast;
 import com.anray.musicapp.MusicApplication;
 import com.anray.musicapp.R;
 import com.anray.musicapp.data.storage.models.Mp3File;
+import com.anray.musicapp.data.storage.models.Mp3FileDao;
 import com.anray.musicapp.managers.DataManager;
+import com.anray.musicapp.ui.adapters.FileListAdapter;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -35,6 +38,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private Button mButton;
     private ImageView mImageView;
 
+    private List<Mp3File> mp3Base;
+
+    private RecyclerView mRecyclerView;
+    private FileListAdapter mFileListAdapter;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -44,6 +52,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mButton.setOnClickListener(this);
 
         mImageView = (ImageView) findViewById(R.id.image_iv);
+        mRecyclerView = (RecyclerView) findViewById(R.id.list_of_files_rv);
+        mRecyclerView.setLayoutManager(new LinearLayoutManager(this));
 
         //mSongsList = new ArrayList<>();
 
@@ -80,7 +90,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     DataManager.writeLog(TAG, uri.getPath());
 
 
-
                     // get ONLY path without fileName - /storage/emulated/0/Audio/Pop
                     chosenFile = chosenFile.getParentFile();
                     //getParentFile() moves one step back in hierarchy
@@ -90,14 +99,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     if (Environment.MEDIA_MOUNTED.equals(state)) {
 
                         MediaMetadataRetriever mmr = new MediaMetadataRetriever();
-                        List<Mp3File> mp3Base = new ArrayList<>();
+                        mp3Base = new ArrayList<>();
                         File[] files = chosenFile.listFiles();
                         String artist;
                         String title;
 
                         for (int i = 0; i < files.length; i++) {
                             //mSongsList.add(files[i].toString());
-
 
 
                             DataManager.writeLog(TAG, files[i]);
@@ -109,8 +117,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
                             //setBackgroundFromByte(mmr, mImageView);
                             mp3Base.add(new Mp3File(files[i].toString(), i, title, artist));
+
                         }
                         mmr.release();
+                        new MyTaskForSavingToDb().execute();
+                        new MyTaskForLoadingFromDb().execute();
+
                     }
 
                 } else {
@@ -161,6 +173,86 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
             imageView.setBackground(new BitmapDrawable(bitmap));
         }
+
+    }
+
+    class MyTaskForSavingToDb extends AsyncTask<Void, Void, Void> {
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+
+        }
+
+        @Override
+        protected Void doInBackground(Void... params) {
+
+            saveToDb();
+
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Void result) {
+            super.onPostExecute(result);
+
+        }
+
+    }
+
+    class MyTaskForLoadingFromDb extends AsyncTask<Void, Void, List<Mp3File>> {
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+
+        }
+
+        @Override
+        protected List<Mp3File> doInBackground(Void... params) {
+
+
+            return loadFromDb();
+        }
+
+        @Override
+        protected void onPostExecute(List<Mp3File> result) {
+            super.onPostExecute(result);
+
+            mFileListAdapter = new FileListAdapter(result, new FileListAdapter.FilesListViewHolder.CustomClickListener() {
+                @Override
+                public void onUserPlayIconClickListener(int position) {
+
+                }
+            });
+
+            mRecyclerView.swapAdapter(mFileListAdapter, false);
+
+        }
+
+    }
+
+    private void saveToDb() {
+
+
+        Mp3FileDao mMp3FileDao;
+
+        mMp3FileDao = MusicApplication.getDaoSession().getMp3FileDao();
+
+        mMp3FileDao.insertOrReplaceInTx(mp3Base);
+
+
+    }
+
+
+    private List<Mp3File> loadFromDb() {
+
+
+        return MusicApplication.getDaoSession().queryBuilder(Mp3File.class)
+                .orderAsc(Mp3FileDao.Properties.Order)
+                .build()
+                .list();
+
 
     }
 

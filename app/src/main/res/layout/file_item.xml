@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                xmlns:tools="http://schemas.android.com/tools">
+
+    <ImageView
+        android:id="@+id/album_thumb"
+        android:layout_centerInParent="true"
+        android:layout_alignParentLeft="true"
+        android:layout_width="@dimen/album_thumb_100"
+        android:layout_height="@dimen/album_thumb_100"/>
+    <TextView
+        tools:text="fdgdfg"
+        android:id="@+id/artist_tv"
+        android:layout_toRightOf="@+id/album_thumb"
+        android:layout_height="wrap_content"
+        android:layout_width="wrap_content"
+        android:maxLines="1"
+        />
+
+    <TextView
+        tools:text="fdgdfg"
+        android:id="@+id/title_tv"
+        android:layout_below="@+id/artist_tv"
+        android:layout_alignLeft="@+id/artist_tv"
+        android:layout_height="wrap_content"
+        android:layout_width="wrap_content"
+        android:maxLines="1"
+        />
+    <ImageView
+        android:layout_centerInParent="true"
+        android:id="@+id/play_icon_iv"
+        android:layout_alignParentRight="true"
+        android:layout_width="@dimen/icon_size_50"
+        android:layout_height="@dimen/icon_size_50"
+        android:src="@drawable/play_circle_outline"
+        android:background="@android:color/white"
+        />
+
+</RelativeLayout>
