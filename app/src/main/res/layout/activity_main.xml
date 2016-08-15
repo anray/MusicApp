@@ -10,35 +10,65 @@
     android:paddingTop="@dimen/activity_vertical_margin"
     tools:context=".activities.MainActivity">
 
+    <ImageView
+        android:id="@+id/image_iv"
+        android:layout_width="match_parent"
+        android:layout_height="100dp"
+        android:background="@color/colorAccent"
+        />
+
     <Button
         android:id="@+id/choose_btn"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Hello World!"/>
+        android:layout_alignParentRight="true"
+        android:text="@string/load_files"/>
 
     <ImageView
-        android:layout_height="100dp"
-        android:layout_width="match_parent"
-        android:id="@+id/image_iv"
-        android:background="@color/colorAccent"
+        style="@style/buttons"
+        android:id="@+id/previous_iv"
+
+        android:layout_alignBottom="@+id/image_iv"
+        android:src="@drawable/skip_previous_circle_outline"
         />
+
+    <ImageView
+        style="@style/buttons"
+        android:id="@+id/play_iv"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:layout_alignBottom="@+id/image_iv"
+        android:layout_toRightOf="@+id/previous_iv"
+        android:src="@drawable/play_circle_outline"
+        />
+
+    <ImageView
+        style="@style/buttons"
+        android:id="@+id/next_iv"
+
+        android:layout_alignBottom="@+id/image_iv"
+        android:layout_toRightOf="@+id/play_iv"
+        android:src="@drawable/skip_next_circle_outline"
+        />
+
+
     <View
         android:id="@+id/delimiter_v"
-        android:layout_below="@+id/image_iv"
-        android:layout_height="2dp"
         android:layout_width="match_parent"
-        android:background="@color/colorPrimary"
-        android:layout_marginTop="8dp"
+        android:layout_height="2dp"
+        android:layout_below="@+id/image_iv"
         android:layout_marginBottom="8dp"
+        android:layout_marginTop="8dp"
+        android:background="@color/colorPrimary"
         />
+
     <android.support.v7.widget.RecyclerView
         android:id="@+id/list_of_files_rv"
-        android:layout_below="@+id/delimiter_v"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/delimiter_v">
 
     </android.support.v7.widget.RecyclerView>
-
 
 
 </RelativeLayout>

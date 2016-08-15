@@ -58,6 +58,15 @@ public class FileListAdapter extends RecyclerView.Adapter<FileListAdapter.FilesL
 
         }
 
+        //setting of picture
+        if (file.getPlayingFlag() == 1) {
+            holder.mPlay.setImageResource(R.drawable.pause_circle_outline);
+        } else{
+            holder.mPlay.setImageResource(R.drawable.play_circle_outline);
+        }
+
+
+
 
         //закрашивает сердце у тех юзеров, которых я лайкнул
         //и снимает закраску у тех, кого анлайкнул
