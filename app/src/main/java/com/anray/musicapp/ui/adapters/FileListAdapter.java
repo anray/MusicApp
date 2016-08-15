@@ -1,6 +1,10 @@
 package com.anray.musicapp.ui.adapters;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.drawable.BitmapDrawable;
+import android.media.MediaMetadataRetriever;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -49,11 +53,11 @@ public class FileListAdapter extends RecyclerView.Adapter<FileListAdapter.FilesL
         holder.mArtist.setText(file.getArtist());
 
         //if title is empty
-        if (file.getTitle() != null && !file.getTitle().isEmpty()){
+        if (file.getTitle() != null && !file.getTitle().isEmpty()) {
             holder.mTitle.setText(file.getTitle());
         } else {
             String line = file.getFullPath();
-            line = line.substring(line.lastIndexOf("/")+1,line.indexOf(".")-1);
+            line = line.substring(line.lastIndexOf("/") + 1, line.indexOf(".") - 1);
             holder.mTitle.setText(line);
 
         }
@@ -61,11 +65,12 @@ public class FileListAdapter extends RecyclerView.Adapter<FileListAdapter.FilesL
         //setting of picture
         if (file.getPlayingFlag() == 1) {
             holder.mPlay.setImageResource(R.drawable.pause_circle_outline);
-        } else{
+        } else {
             holder.mPlay.setImageResource(R.drawable.play_circle_outline);
         }
 
 
+        setBackgroundFromByte(file.getFullPath(), holder.mAlbumCover);
 
 
         //закрашивает сердце у тех юзеров, которых я лайкнул
@@ -80,6 +85,22 @@ public class FileListAdapter extends RecyclerView.Adapter<FileListAdapter.FilesL
 //            }
 //        }
 
+
+    }
+
+    private void setBackgroundFromByte(String path, ImageView imageView) {
+
+        MediaMetadataRetriever mmr = new MediaMetadataRetriever();
+        mmr.setDataSource(path);
+        byte[] image = mmr.getEmbeddedPicture();
+        if (image != null) {
+            Bitmap bitmap = BitmapFactory.decodeByteArray(image, 0, image.length);
+
+            imageView.setBackground(new BitmapDrawable(bitmap));
+        } else {
+
+            imageView.setBackground(mContext.getResources().getDrawable(R.drawable.album_bg));
+        }
 
     }
 

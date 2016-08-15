@@ -360,6 +360,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     private void startPlaying(String pathTofile) {
 
+        if (mMediaPlayer == null){
+            mMediaPlayer = new MediaPlayer();
+        }
+
         try {
 
             mMediaPlayer.setDataSource(pathTofile.toString());
