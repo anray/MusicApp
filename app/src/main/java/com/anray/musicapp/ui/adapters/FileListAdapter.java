@@ -59,6 +59,7 @@ public class FileListAdapter extends RecyclerView.Adapter<FileListAdapter.FilesL
             holder.mTitle.setText(file.getTitle());
         } else {
             String line = file.getFullPath();
+            //get fileName
             line = line.substring(line.lastIndexOf("/") + 1, line.indexOf(".") - 1);
             holder.mTitle.setText(line);
 
