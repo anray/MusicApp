@@ -1,10 +1,6 @@
 package com.anray.musicapp.activities;
 
 import android.content.Intent;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.drawable.BitmapDrawable;
-import android.media.AudioManager;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer;
 import android.net.Uri;
@@ -25,6 +21,7 @@ import com.anray.musicapp.data.storage.models.Mp3File;
 import com.anray.musicapp.data.storage.models.Mp3FileDao;
 import com.anray.musicapp.managers.DataManager;
 import com.anray.musicapp.ui.adapters.FileListAdapter;
+import com.anray.musicapp.utils.MyMediaPlayer;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -34,20 +31,28 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     private static final int FILE_SELECT_CODE = 0;
     private static final String TAG = "MainActivity";
+    private static final String PLAYING_SONG_PATH = "PLAYING_SONG_PATH";
+    private static final String PLAYING_STATE = "PLAYING_STATE";
+    private static final String PLAYING_POSITION = "PLAYING_POSITION";
+    private static final String PLAYING_SONG_ORDER = "PLAYING_SONG_ORDER";
 
-    //private List<String> mSongsList;
 
     private Button mButton;
     private ImageView mMainCoverImage, mPlay, mNext, mPrevious;
 
-    private List<Mp3File> mp3Base;
+    private List<Mp3File> mMp3FilesList;
 
     private RecyclerView mRecyclerView;
     private FileListAdapter mFileListAdapter;
 
-    private MediaPlayer mMediaPlayer;
+    private MyMediaPlayer mMediaPlayer;
 
-    private int mListItemsCount;
+
+    private int mPlayingState = 0;
+    private int mCurrentPlayingSongPosition, mCurrentPlayingSongOrder, mSongsInPlaylist;
+
+    private String mCurrentPlayingSongPath;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -67,17 +72,63 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mRecyclerView = (RecyclerView) findViewById(R.id.list_of_files_rv);
         mRecyclerView.setLayoutManager(new LinearLayoutManager(this));
 
-        if (mFileListAdapter == null) {
-            mFileListAdapter = new FileListAdapter(loadFromDb(), new FileListAdapter.FilesListViewHolder.CustomClickListener() {
-                @Override
-                public void onUserPlayIconClickListener(int position) {
+        mMediaPlayer = new MyMediaPlayer();
+        mMediaPlayer.setOnCompletionListener(this);
+        mMp3FilesList = loadFromDb();
+        //need to current number of tracks
+        mSongsInPlaylist = mMp3FilesList.size();
 
-                }
-            });
+        //если база не пуста
+        if (mMp3FilesList.size() > 0) {
+            showSongsList(mMp3FilesList);
+
+            //если бандл пуст, берем первую песню из БД
+            if (savedInstanceState == null) {
+
+                mCurrentPlayingSongOrder = 1;
+                mCurrentPlayingSongPath = loadSongByOrder(mCurrentPlayingSongOrder);
+
+                setSongInMediaPlayer(mCurrentPlayingSongPath);
+
+                DataManager.writeLog("savedInstanceState is null");
+
+            } else {
+
+                DataManager.writeLog("savedInstanceState NOT null");
+                mCurrentPlayingSongPath = savedInstanceState.getString(PLAYING_SONG_PATH);
+                mCurrentPlayingSongPosition = savedInstanceState.getInt(PLAYING_POSITION);
+                mCurrentPlayingSongOrder = savedInstanceState.getInt(PLAYING_SONG_ORDER);
+                mPlayingState = savedInstanceState.getInt(PLAYING_STATE);
+
+                setSongInMediaPlayer(mCurrentPlayingSongPath);
+                mMediaPlayer.seekTo(mCurrentPlayingSongPosition);
+                restorePlayingState();
+
+            }
         }
-        mRecyclerView.setAdapter(mFileListAdapter);
 
+    }
 
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+
+        mCurrentPlayingSongPath = mMediaPlayer.getDataSource();
+        outState.putString(PLAYING_SONG_PATH, mCurrentPlayingSongPath);
+
+        mCurrentPlayingSongPosition = mMediaPlayer.getCurrentPosition();
+        outState.putInt(PLAYING_POSITION, mCurrentPlayingSongPosition);
+
+        outState.putInt(PLAYING_STATE, mPlayingState);
+
+        outState.putInt(PLAYING_SONG_ORDER, mCurrentPlayingSongOrder);
+
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        DataManager.writeLog(TAG, "onPause");
     }
 
     @Override
@@ -94,15 +145,28 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     @Override
-    protected void onPause() {
-        super.onPause();
-        DataManager.writeLog(TAG, "onPause");
+    public void onClick(View view) {
+        switch (view.getId()) {
+            case R.id.choose_btn:
+                showFileChooser();
+                break;
+            case R.id.play_iv:
+                playButtonAction();
+                break;
+            case R.id.next_iv:
+                skipNext();
+                break;
+            case R.id.previous_iv:
+                skipPrev();
+                break;
+        }
     }
+
 
     private void showFileChooser() {
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
         intent.setType("audio/mpeg4-generic");
-        //intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
 
         try {
             startActivityForResult(
@@ -139,7 +203,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     if (Environment.MEDIA_MOUNTED.equals(state)) {
 
                         MediaMetadataRetriever mmr = new MediaMetadataRetriever();
-                        mp3Base = new ArrayList<>();
+                        mMp3FilesList = new ArrayList<>();
                         File[] files = chosenFile.listFiles();
                         String artist = "";
                         String title = "";
@@ -149,10 +213,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         for (int i = 0; i < files.length; i++) {
 
 
-
                             DataManager.writeLog(TAG, files[i]);
-
-
                             try {
                                 //need because some mp3 file may be corrupted
                                 mmr.setDataSource(files[i].toString());
@@ -163,15 +224,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                                 continue;
                             }
 
-
-                            //setBackgroundFromByte(mmr, mMainCoverImage);
-                            mp3Base.add(new Mp3File(files[i].toString(), index, title, artist));
+                            mMp3FilesList.add(new Mp3File(files[i].toString(), index, title, artist));
                             index++;
 
                         }
                         mmr.release();
                         new MyTaskForSavingToDb().execute();
-                        new MyTaskForLoadingFromDb().execute();
+
 
                     }
 
@@ -185,230 +244,168 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         super.onActivityResult(requestCode, resultCode, data);
     }
 
-    @Override
-    public void onClick(View view) {
-        switch (view.getId()) {
-            case R.id.choose_btn:
-                showFileChooser();
-                break;
-            case R.id.play_iv:
-
-                if (mMediaPlayer == null) {
-
-                    Mp3File file = MusicApplication.getDaoSession().queryBuilder(Mp3File.class)
-                            .where(Mp3FileDao.Properties.PlayingFlag.eq(1))
-                            .build()
-                            .unique();
-
-                    if (file != null) {
-                        startPlaying(file.getFullPath());
-                    } else {
-                        firstStart();
-                    }
-                } else {
-                    if (mMediaPlayer.isPlaying()) {
-                        mMediaPlayer.pause();
-                        mPlay.setImageResource(R.drawable.play_circle_outline);
-                    } else if (!mMediaPlayer.isPlaying()) {
-                        mMediaPlayer.start();
-                        mPlay.setImageResource(R.drawable.pause_circle_outline);
-                    }
-                }
-//                if (mMediaPlayer.isPlaying()) {
-//                    mMediaPlayer.pause();
-//                    mPlay.setImageResource(R.drawable.play_circle_outline);
-//                } else {
-//                    mMediaPlayer.start();
-//                    mPlay.setImageResource(R.drawable.pause_circle_outline);
-//                }
-//        }catch(Exception e){
-//            firstStart();
-//            mPlay.setImageResource(R.drawable.pause_circle_outline);
-//        }
-                break;
-            case R.id.next_iv:
-                skipNext();
-                break;
-            case R.id.previous_iv:
-                skipPrevious();
-                break;
-        }
+    private void showSongsList(List<Mp3File> mp3FilesList) {
 
 
+        mFileListAdapter = new FileListAdapter(mp3FilesList, new FileListAdapter.FilesListViewHolder.CustomClickListener() {
+            @Override
+            public void onUserPlayIconClickListener(int position) {
+
+            }
+        });
+
+        mRecyclerView.setAdapter(mFileListAdapter);
     }
 
 
-    private void firstStart() {
-        Mp3File file = MusicApplication.getDaoSession().queryBuilder(Mp3File.class)
-                .where(Mp3FileDao.Properties.Order.eq(1))
-                .build()
-                .unique();
-
-        //if files are not loaded from directory, at all
-        if (file != null) {
-
-            mMediaPlayer = new MediaPlayer();
-            startPlaying(file.getFullPath());
-
-            //set current playing flag
-            file.setPlayingFlag(1);
-            MusicApplication.getDaoSession().getMp3FileDao().insertOrReplace(file);
+    private void setSongInMediaPlayer(String currentPlayingSongPath) {
+        try {
+            mMediaPlayer.setDataSource(currentPlayingSongPath);
+            mMediaPlayer.prepare();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
+    private void restorePlayingState() {
 
-    private Mp3File getMusicFileFromDB(String jkhkj) {
+        if (mPlayingState == 1) {
+            mMediaPlayer.start();
+            setPauseButtonImage();
 
+        } else {
+            //если вызвать паузу из остановленного состояния, то слетает и SetDataSource и prepare
+            if (mMediaPlayer.isPlaying()) {
+                mMediaPlayer.pause();
+            }
+            setPlayButtonImage();
+            mPlayingState = 0;
+        }
 
-        Mp3File file = MusicApplication.getDaoSession().queryBuilder(Mp3File.class)
-                .where(Mp3FileDao.Properties.PlayingFlag.eq(1))
-                .build()
-                .unique();
+    }
 
-        if (file != null) {
-            return MusicApplication.getDaoSession().queryBuilder(Mp3File.class)
-                    .where(Mp3FileDao.Properties.Order.eq(file.getOrder() + 1))
-                    .build()
-                    .unique();
+    private void playButtonAction() {
+
+        if (mPlayingState == 0) {
+            mMediaPlayer.start();
+            setPauseButtonImage();
+            mPlayingState = 1;
+
         } else {
 
+            mCurrentPlayingSongPosition = mMediaPlayer.getCurrentPosition();
+            mMediaPlayer.pause();
+            setPlayButtonImage();
+            mPlayingState = 0;
         }
-        return file;
+
+    }
+
+    private void setPlayButtonImage() {
+
+        mPlay.setImageResource(R.drawable.play_circle_outline);
+
+    }
+
+    private void setPauseButtonImage() {
+
+        mPlay.setImageResource(R.drawable.pause_circle_outline);
+
     }
 
 
     private void skipNext() {
 
-        if (mMediaPlayer != null && mMediaPlayer.isPlaying()) {
-            playNextSong();
+        if (mSongsInPlaylist == 1) {
+            return;
+        } else if (mCurrentPlayingSongOrder == mSongsInPlaylist) {
+            mCurrentPlayingSongOrder = 1;
+        } else {
+            mCurrentPlayingSongOrder += 1;
         }
+
+        String filePath = loadSongByOrder(mCurrentPlayingSongOrder);
+        mMediaPlayer.reset();
+        setSongInMediaPlayer(filePath);
+        restorePlayingState();
+
+
     }
 
-    private void playNextSong() {
-        try {
-            //is there any track?
-            mMediaPlayer.getTrackInfo();
+    private void skipPrev() {
 
-            stopPlaying();
-
-            //what was playing
-            Mp3File file = MusicApplication.getDaoSession().queryBuilder(Mp3File.class)
-                    .where(Mp3FileDao.Properties.PlayingFlag.eq(1))
-                    .build()
-                    .unique();
-
-
-            //count next
-            int order;
-            if (file.getOrder() == (int) MusicApplication.getDaoSession().queryBuilder(Mp3File.class).count()) {
-                order = 1;
-            } else {
-                order = file.getOrder() + 1;
-            }
-
-            //remove current playing flag
-            file.setPlayingFlag(0);
-            MusicApplication.getDaoSession().getMp3FileDao().insertOrReplace(file);
-
-            //set current playing flag
-            file = MusicApplication.getDaoSession().queryBuilder(Mp3File.class)
-                    .where(Mp3FileDao.Properties.Order.eq(order))
-                    .build()
-                    .unique();
-
-            file.setPlayingFlag(1);
-            MusicApplication.getDaoSession().getMp3FileDao().insertOrReplace(file);
-
-            mMediaPlayer.reset();
-            startPlaying(file.getFullPath());
-
-
-        } catch (Exception e) {
-
+        if (mSongsInPlaylist == 1) {
+            return;
+        } else if (mCurrentPlayingSongOrder == 1) {
+            mCurrentPlayingSongOrder = mSongsInPlaylist;
+        } else {
+            mCurrentPlayingSongOrder -= 1;
         }
+
+        String filePath = loadSongByOrder(mCurrentPlayingSongOrder);
+        mMediaPlayer.reset();
+        setSongInMediaPlayer(filePath);
+        restorePlayingState();
+
     }
 
-    private void skipPrevious() {
-        if (mMediaPlayer != null && mMediaPlayer.isPlaying()) {
+
+    private String loadSongByOrder(int order) {
+
+        Mp3File file = MusicApplication.getDaoSession().queryBuilder(Mp3File.class)
+                .where(Mp3FileDao.Properties.Order.eq(order))
+                .build()
+                .unique();
+
+        return file.getFullPath();
+
+    }
+
+
+    private List<Mp3File> loadFromDb() {
+
+        List<Mp3File> list = MusicApplication.getDaoSession().queryBuilder(Mp3File.class)
+                .orderAsc(Mp3FileDao.Properties.Order)
+                .build()
+                .list();
+
+        return list;
+
+    }
+
+
+
+    @Override
+    public void onPrepared(MediaPlayer mp) {
+        DataManager.writeLog(TAG, "onPrepared");
+
+    }
+
+
+    @Override
+    public void onCompletion(MediaPlayer mp) {
+        DataManager.writeLog(TAG, "onCompletion");
+        skipNext();
+    }
+
+    private void releaseMP() {
+        if (mMediaPlayer != null) {
             try {
-                //is there any track?
-                mMediaPlayer.getTrackInfo();
-
-                stopPlaying();
-
-                //what was playing
-                Mp3File file = MusicApplication.getDaoSession().queryBuilder(Mp3File.class)
-                        .where(Mp3FileDao.Properties.PlayingFlag.eq(1))
-                        .build()
-                        .unique();
-
-
-                //count next
-                int order;
-                if (file.getOrder() == 1) {
-                    order = (int) MusicApplication.getDaoSession().queryBuilder(Mp3File.class).count();
-                } else {
-                    order = file.getOrder() - 1;
-                }
-
-                //remove current playing flag
-                file.setPlayingFlag(0);
-                MusicApplication.getDaoSession().getMp3FileDao().insertOrReplace(file);
-
-                //set current playing flag
-                file = MusicApplication.getDaoSession().queryBuilder(Mp3File.class)
-                        .where(Mp3FileDao.Properties.Order.eq(order))
-                        .build()
-                        .unique();
-
-                file.setPlayingFlag(1);
-                MusicApplication.getDaoSession().getMp3FileDao().insertOrReplace(file);
-
-                mMediaPlayer.reset();
-                startPlaying(file.getFullPath());
-
+                mMediaPlayer.release();
+                mMediaPlayer = null;
             } catch (Exception e) {
-
+                e.printStackTrace();
             }
         }
+
     }
 
-    private void startPlaying(String pathTofile) {
+    private void saveToDb() {
 
-        if (mMediaPlayer == null) {
-            mMediaPlayer = new MediaPlayer();
-        }
+        Mp3FileDao mMp3FileDao;
+        mMp3FileDao = MusicApplication.getDaoSession().getMp3FileDao();
+        mMp3FileDao.deleteAll();
 
-        try {
-
-            mMediaPlayer.setDataSource(pathTofile.toString());
-            mMediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
-            mMediaPlayer.prepare();
-            mMediaPlayer.start();
-            mPlay.setImageResource(R.drawable.pause_circle_outline);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void stopPlaying() {
-        mMediaPlayer.stop();
-        mPlay.setImageResource(R.drawable.play_circle_outline);
-    }
-
-    /**
-     * Sets background to album cover if it is present, if it is not - then doing notihing
-     *
-     * @param mmr
-     * @param imageView
-     */
-    private void setBackgroundFromByte(MediaMetadataRetriever mmr, ImageView imageView) {
-
-        byte[] image = mmr.getEmbeddedPicture();
-        if (image != null) {
-            Bitmap bitmap = BitmapFactory.decodeByteArray(image, 0, image.length);
-
-            imageView.setBackground(new BitmapDrawable(bitmap));
-        }
+        mMp3FileDao.insertOrReplaceInTx(mMp3FilesList);
 
     }
 
@@ -432,165 +429,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         protected void onPostExecute(Void result) {
             super.onPostExecute(result);
 
-        }
-
-    }
-
-    class MyTaskForLoadingFromDb extends AsyncTask<Void, Void, List<Mp3File>> {
-
-        @Override
-        protected void onPreExecute() {
-            super.onPreExecute();
-
-        }
-
-        @Override
-        protected List<Mp3File> doInBackground(Void... params) {
-
-
-            return loadFromDb();
-        }
-
-        @Override
-        protected void onPostExecute(List<Mp3File> result) {
-            super.onPostExecute(result);
-
-            if (mMediaPlayer != null) {
-                mMediaPlayer.release();
-                mMediaPlayer = null;
-                mPlay.setImageResource(R.drawable.play_circle_outline);
-            }
-
-            mFileListAdapter = new FileListAdapter(result, new FileListAdapter.FilesListViewHolder.CustomClickListener() {
-                @Override
-                public void onUserPlayIconClickListener(int position) {
-
-                }
-            });
-
-            mRecyclerView.setAdapter(mFileListAdapter);
+            mMediaPlayer.reset();
+            mPlayingState = 0;
+            setPlayButtonImage();
+            showSongsList(mMp3FilesList);
+            mCurrentPlayingSongOrder = 1;
+            mCurrentPlayingSongPath = loadSongByOrder(mCurrentPlayingSongOrder);
+            setSongInMediaPlayer(mCurrentPlayingSongPath);
 
         }
 
     }
-
-    private void saveToDb() {
-
-
-        Mp3FileDao mMp3FileDao;
-
-        mMp3FileDao = MusicApplication.getDaoSession().getMp3FileDao();
-
-        mMp3FileDao.deleteAll();
-
-
-        mMp3FileDao.insertOrReplaceInTx(mp3Base);
-
-
-    }
-
-
-    private List<Mp3File> loadFromDb() {
-
-        List<Mp3File> list = new ArrayList<>();
-
-        list = MusicApplication.getDaoSession().queryBuilder(Mp3File.class)
-                .orderAsc(Mp3FileDao.Properties.Order)
-                .build()
-                .list();
-
-        //need to current number of tracks
-        mListItemsCount = list.size();
-
-
-        return list;
-
-
-    }
-
-    @Override
-    public void onPrepared(MediaPlayer mp) {
-        DataManager.writeLog(TAG, "onPrepared");
-        mp.start();
-    }
-
-    @Override
-    public void onCompletion(MediaPlayer mp) {
-        DataManager.writeLog(TAG, "onCompletion");
-        playNextSong();
-
-    }
-
-    private void releaseMP() {
-        if (mMediaPlayer != null) {
-            try {
-                mMediaPlayer.release();
-                mMediaPlayer = null;
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-
-//        //what was playing
-//        Mp3File file = MusicApplication.getDaoSession().queryBuilder(Mp3File.class)
-//                .where(Mp3FileDao.Properties.PlayingFlag.eq(1))
-//                .build()
-//                .unique();
-//
-//        //remove current playing flag
-//        if (file != null) {
-//            file.setPlayingFlag(0);
-//            MusicApplication.getDaoSession().getMp3FileDao().insertOrReplace(file);
-//        }
-    }
-
-
-//    private void play(String pathTofile) {
-//        try {
-//
-//            //remove flag from now playing
-//            Mp3File file = MusicApplication.getDaoSession().queryBuilder(Mp3File.class)
-//                    .where(Mp3FileDao.Properties.PlayingFlag.eq(1))
-//                    .build()
-//                    .unique();
-//
-//            if (file != null) {
-//                file.setPlayingFlag(0);
-//            } else {
-//                //verification if nothing is playing
-//                file = MusicApplication.getDaoSession().queryBuilder(Mp3File.class)
-//                        .where(Mp3FileDao.Properties.Order.eq(1))
-//                        .build()
-//                        .unique();
-//
-//                startPlaying(file.getFullPath());
-//
-//            }
-//
-//            MusicApplication.getDaoSession().getMp3FileDao().insertOrReplace(file);
-//            //remove flag from now playing
-//
-//
-//            startPlaying(pathTofile.toString());
-//
-//
-//            //add flag to now playing
-//            file = MusicApplication.getDaoSession().queryBuilder(Mp3File.class)
-//                    .where(Mp3FileDao.Properties.FullPath.eq(pathTofile.toString()))
-//                    .build()
-//                    .unique();
-//
-//            file.setPlayingFlag(1);
-//
-//            MusicApplication.getDaoSession().getMp3FileDao().insertOrReplace(file);
-//            //add flag to now playing
-//
-//            //redraw fileList
-//            mFileListAdapter.notifyDataSetChanged();
-//
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
-//    }
-
 }

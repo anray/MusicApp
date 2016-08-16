@@ -34,6 +34,12 @@ public class DataManager {
         }
     }
 
+    public static void writeLog(Object message) {
+        if (true) {
+            Log.d("Fixed TAG", message.toString());
+        }
+    }
+
     public static void showToast(String message) {
         Toast.makeText(MusicApplication.getContext(), message, Toast.LENGTH_SHORT).show();
     }

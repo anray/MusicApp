@@ -12,7 +12,6 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import com.anray.musicapp.MusicApplication;
 import com.anray.musicapp.R;
 import com.anray.musicapp.data.storage.models.Mp3File;
 import com.anray.musicapp.managers.DataManager;
@@ -48,7 +47,7 @@ public class FileListAdapter extends RecyclerView.Adapter<FileListAdapter.FilesL
     @Override
     public void onBindViewHolder(final FilesListViewHolder holder, int position) {
 
-        //mDataManager = DataManager.getInstance();
+
         final Mp3File file = mMp3Files.get(position);
 
 
@@ -72,39 +71,39 @@ public class FileListAdapter extends RecyclerView.Adapter<FileListAdapter.FilesL
             holder.mPlay.setImageResource(R.drawable.play_circle_outline);
         }
 
-        DataManager.writeLog(TAG,file.getFullPath());
+        DataManager.writeLog(TAG, file.getFullPath());
         setBackgroundFromByte(file.getFullPath(), holder.mAlbumCover);
-
-
-        //закрашивает сердце у тех юзеров, которых я лайкнул
-        //и снимает закраску у тех, кого анлайкнул
-//        for (Likes like : file.getMLikes()) {
-//            if (like.getUserIdWhoLiked().equalsIgnoreCase(mDataManager.getPreferencesManager().getUserId())) {
-//                holder.mLikesHeart.setImageResource(R.drawable.heart);
-//                //break потому что не надо дальше проходить лист лайков, потому что у нас в разметке дефолтное значение - незакрашенный лайк
-//                break;
-//            } else {
-//                holder.mLikesHeart.setImageResource(R.drawable.heart_outline);
-//            }
-//        }
 
 
     }
 
+    /**
+     * Sets background to album cover if it is present, if it is not - then doing notihing
+     *
+     * @param mmr
+     * @param imageView
+     */
     private void setBackgroundFromByte(String path, ImageView imageView) {
 
         MediaMetadataRetriever mmr = new MediaMetadataRetriever();
 
         mmr.setDataSource(path);
-        byte[] image = mmr.getEmbeddedPicture();
-        if (image != null) {
-            Bitmap bitmap = BitmapFactory.decodeByteArray(image, 0, image.length);
 
-            imageView.setBackground(new BitmapDrawable(bitmap));
-        } else {
+        try {
+            byte[] image = mmr.getEmbeddedPicture();
+            if (image != null) {
+                Bitmap bitmap = BitmapFactory.decodeByteArray(image, 0, image.length);
 
-            imageView.setBackground(mContext.getResources().getDrawable(R.drawable.album_bg));
+                imageView.setBackground(new BitmapDrawable(bitmap));
+            } else {
+
+                imageView.setBackground(mContext.getResources().getDrawable(R.drawable.image_not_available));
+            }
+        } catch (Exception e) {
+            imageView.setBackground(mContext.getResources().getDrawable(R.drawable.image_not_available));
         }
+
+        mmr.release();
 
     }
 
@@ -132,8 +131,6 @@ public class FileListAdapter extends RecyclerView.Adapter<FileListAdapter.FilesL
 
             mAlbumCover = (ImageView) itemView.findViewById(R.id.album_thumb);
             mPlay = (ImageView) itemView.findViewById(R.id.play_icon_iv);
-
-            //mDummy = mUserImage.getContext().getResources().getDrawable(R.drawable.user_bg);
 
             mPlay.setOnClickListener(this);
 
