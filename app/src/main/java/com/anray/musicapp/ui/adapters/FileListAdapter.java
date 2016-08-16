@@ -12,8 +12,10 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import com.anray.musicapp.MusicApplication;
 import com.anray.musicapp.R;
 import com.anray.musicapp.data.storage.models.Mp3File;
+import com.anray.musicapp.managers.DataManager;
 
 import java.util.List;
 
@@ -69,7 +71,7 @@ public class FileListAdapter extends RecyclerView.Adapter<FileListAdapter.FilesL
             holder.mPlay.setImageResource(R.drawable.play_circle_outline);
         }
 
-
+        DataManager.writeLog(TAG,file.getFullPath());
         setBackgroundFromByte(file.getFullPath(), holder.mAlbumCover);
 
 
@@ -91,6 +93,7 @@ public class FileListAdapter extends RecyclerView.Adapter<FileListAdapter.FilesL
     private void setBackgroundFromByte(String path, ImageView imageView) {
 
         MediaMetadataRetriever mmr = new MediaMetadataRetriever();
+
         mmr.setDataSource(path);
         byte[] image = mmr.getEmbeddedPicture();
         if (image != null) {

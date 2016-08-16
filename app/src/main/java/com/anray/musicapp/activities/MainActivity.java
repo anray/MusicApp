@@ -454,7 +454,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 }
             });
 
-            mRecyclerView.swapAdapter(mFileListAdapter, false);
+            mRecyclerView.setAdapter(mFileListAdapter);
 
         }
 
