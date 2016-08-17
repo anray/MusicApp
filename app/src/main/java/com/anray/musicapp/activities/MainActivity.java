@@ -80,13 +80,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         //если база не пуста
         if (mMp3FilesList.size() > 0) {
-            showSongsList(mMp3FilesList);
 
             //если бандл пуст, берем первую песню из БД
             if (savedInstanceState == null) {
 
                 mCurrentPlayingSongOrder = 1;
-                mCurrentPlayingSongPath = loadSongByOrder(mCurrentPlayingSongOrder);
+                Mp3File file = loadSongByOrder(mCurrentPlayingSongOrder);
+                mCurrentPlayingSongPath = file.getFullPath();
+                updateNewCurrent(file);
+
+                showSongsList(mMp3FilesList);
 
                 setSongInMediaPlayer(mCurrentPlayingSongPath);
 
@@ -151,13 +154,19 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 showFileChooser();
                 break;
             case R.id.play_iv:
-                playButtonAction();
+                if (mMediaPlayer.getDataSource() != null) {
+                    playButtonAction();
+                }
                 break;
             case R.id.next_iv:
-                skipNext();
+                if (mMediaPlayer.getDataSource() != null) {
+                    skipNext();
+                }
                 break;
             case R.id.previous_iv:
-                skipPrev();
+                if (mMediaPlayer.getDataSource() != null) {
+                    skipPrev();
+                }
                 break;
         }
     }
@@ -266,6 +275,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             e.printStackTrace();
         }
     }
+
     private void restorePlayingState() {
 
         if (mPlayingState == 1) {
@@ -315,6 +325,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     private void skipNext() {
 
+        int previousSongOrder = mCurrentPlayingSongOrder;
+
         if (mSongsInPlaylist == 1) {
             return;
         } else if (mCurrentPlayingSongOrder == mSongsInPlaylist) {
@@ -323,15 +335,24 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             mCurrentPlayingSongOrder += 1;
         }
 
-        String filePath = loadSongByOrder(mCurrentPlayingSongOrder);
+        mFileListAdapter.notifyItemChanged(previousSongOrder - 1);
+        mFileListAdapter.notifyItemChanged(mCurrentPlayingSongOrder - 1);
+
+        Mp3File file = loadSongByOrder(mCurrentPlayingSongOrder);
+        updateNewCurrent(file);
+        updateOldCurrent(previousSongOrder);
+
+        String newFilePath = file.getFullPath();
         mMediaPlayer.reset();
-        setSongInMediaPlayer(filePath);
+        setSongInMediaPlayer(newFilePath);
         restorePlayingState();
 
 
     }
 
     private void skipPrev() {
+
+        int previousSongOrder = mCurrentPlayingSongOrder;
 
         if (mSongsInPlaylist == 1) {
             return;
@@ -341,22 +362,50 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             mCurrentPlayingSongOrder -= 1;
         }
 
-        String filePath = loadSongByOrder(mCurrentPlayingSongOrder);
+        mFileListAdapter.notifyItemChanged(previousSongOrder - 1);
+        mFileListAdapter.notifyItemChanged(mCurrentPlayingSongOrder - 1);
+
+        Mp3File file = loadSongByOrder(mCurrentPlayingSongOrder);
+        updateNewCurrent(file);
+        updateOldCurrent(previousSongOrder);
+
+        String newFilePath = file.getFullPath();
         mMediaPlayer.reset();
-        setSongInMediaPlayer(filePath);
+        setSongInMediaPlayer(newFilePath);
         restorePlayingState();
 
     }
 
 
-    private String loadSongByOrder(int order) {
+    private void updateNewCurrent(Mp3File file) {
+
+        file.setPlayingFlag(1);
+        Mp3FileDao mp3FileDao = MusicApplication.getDaoSession().getMp3FileDao();
+
+        mp3FileDao.insertOrReplace(file);
+
+    }
+
+    private void updateOldCurrent(int order) {
+
+        Mp3File file = loadSongByOrder(order);
+        file.setPlayingFlag(0);
+
+        Mp3FileDao mp3FileDao = MusicApplication.getDaoSession().getMp3FileDao();
+
+        mp3FileDao.insertOrReplace(file);
+
+    }
+
+
+    private Mp3File loadSongByOrder(int order) {
 
         Mp3File file = MusicApplication.getDaoSession().queryBuilder(Mp3File.class)
                 .where(Mp3FileDao.Properties.Order.eq(order))
                 .build()
                 .unique();
 
-        return file.getFullPath();
+        return file;
 
     }
 
@@ -373,7 +422,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
 
-
     @Override
     public void onPrepared(MediaPlayer mp) {
         DataManager.writeLog(TAG, "onPrepared");
@@ -384,7 +432,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     public void onCompletion(MediaPlayer mp) {
         DataManager.writeLog(TAG, "onCompletion");
-        skipNext();
+        if (mMediaPlayer.getDataSource() != null) {
+            skipNext();
+        }
     }
 
     private void releaseMP() {
@@ -432,9 +482,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             mMediaPlayer.reset();
             mPlayingState = 0;
             setPlayButtonImage();
-            showSongsList(mMp3FilesList);
+
             mCurrentPlayingSongOrder = 1;
-            mCurrentPlayingSongPath = loadSongByOrder(mCurrentPlayingSongOrder);
+            Mp3File file = loadSongByOrder(mCurrentPlayingSongOrder);
+            mCurrentPlayingSongPath = file.getFullPath();
+            updateNewCurrent(file);
+
+            mSongsInPlaylist = mMp3FilesList.size();
+            showSongsList(mMp3FilesList);
+
             setSongInMediaPlayer(mCurrentPlayingSongPath);
 
         }

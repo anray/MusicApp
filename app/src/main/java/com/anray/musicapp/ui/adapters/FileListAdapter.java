@@ -10,6 +10,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 
 import com.anray.musicapp.R;
@@ -75,12 +76,18 @@ public class FileListAdapter extends RecyclerView.Adapter<FileListAdapter.FilesL
         setBackgroundFromByte(file.getFullPath(), holder.mAlbumCover);
 
 
+        if (file.getPlayingFlag() == 1) {
+            holder.mRelativeLayout.setBackgroundColor(mContext.getResources().getColor(R.color.yellow));
+        } else {
+            holder.mRelativeLayout.setBackgroundColor(0);
+        }
+
+
     }
 
     /**
      * Sets background to album cover if it is present, if it is not - then doing notihing
      *
-     * @param mmr
      * @param imageView
      */
     private void setBackgroundFromByte(String path, ImageView imageView) {
@@ -116,6 +123,7 @@ public class FileListAdapter extends RecyclerView.Adapter<FileListAdapter.FilesL
 
         protected TextView mTitle, mArtist;
         protected ImageView mAlbumCover, mPlay;
+        protected RelativeLayout mRelativeLayout;
 
         private CustomClickListener mListener;
 
@@ -125,9 +133,9 @@ public class FileListAdapter extends RecyclerView.Adapter<FileListAdapter.FilesL
             this.mListener = customClickListener;
 
 
+            mRelativeLayout = (RelativeLayout) itemView;
             mTitle = (TextView) itemView.findViewById(R.id.title_tv);
             mArtist = (TextView) itemView.findViewById(R.id.artist_tv);
-
 
             mAlbumCover = (ImageView) itemView.findViewById(R.id.album_thumb);
             mPlay = (ImageView) itemView.findViewById(R.id.play_icon_iv);
