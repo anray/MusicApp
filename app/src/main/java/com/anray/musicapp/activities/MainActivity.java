@@ -9,6 +9,9 @@ import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.DocumentsContract;
+import android.provider.Settings;
+import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
@@ -27,6 +30,8 @@ import com.anray.musicapp.managers.DataManager;
 import com.anray.musicapp.ui.adapters.FileListAdapter;
 import com.anray.musicapp.utils.MyMediaPlayer;
 
+import org.w3c.dom.Document;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,7 +44,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private static final String PLAYING_STATE = "PLAYING_STATE";
     private static final String PLAYING_POSITION = "PLAYING_POSITION";
     private static final String PLAYING_SONG_ORDER = "PLAYING_SONG_ORDER";
-    private static final int READ_EXTERNAL_STORAGE_PERMISSION_CODE = 100;
+    private static final int WRITE_EXTERNAL_STORAGE_PERMISSION_CODE = 100;
+    private static final int WRITE_EXTERNAL_STORAGE_PERMISSION_CODE_ONCREATE = 101;
+    private static final int PERMISSION_REQUEST_SETTINGS_CODE = 50;
 
 
     private Button mButton;
@@ -80,7 +87,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         mMediaPlayer = new MyMediaPlayer();
         mMediaPlayer.setOnCompletionListener(this);
+
+
         mMp3FilesList = loadFromDb();
+
         //need to current number of tracks
         mSongsInPlaylist = mMp3FilesList.size();
 
@@ -118,6 +128,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         }
 
+        //grant permissions
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_DENIED) {
+            //ask for permission
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, WRITE_EXTERNAL_STORAGE_PERMISSION_CODE_ONCREATE);
+        }
+
 
     }
 
@@ -128,7 +144,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         DataManager.writeLog(TAG, mCurrentPlayingSongOrder);
 
         if (mCurrentPlayingSongOrder != 0) {
-            updateNewCurrent(loadSongByOrder(mCurrentPlayingSongOrder));
+            try {
+                updateNewCurrent(loadSongByOrder(mCurrentPlayingSongOrder));
+            } catch (Exception e) {
+            }
         }
         showSongsList(mMp3FilesList);
     }
@@ -169,6 +188,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
+
     @Override
     protected void onRestart() {
         super.onRestart();
@@ -184,6 +204,55 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        switch (requestCode) {
+            case WRITE_EXTERNAL_STORAGE_PERMISSION_CODE:
+                if (grantResults.length == 1 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    showFileChooser();
+                }
+                return;
+            case WRITE_EXTERNAL_STORAGE_PERMISSION_CODE_ONCREATE:
+                if (grantResults.length == 1 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    mFileListAdapter.notifyDataSetChanged();
+
+                } else {
+//                    Snackbar.make(getCurrentFocus(), "Необходимо дать разрешения на чтение с диска", Snackbar.LENGTH_INDEFINITE).setAction("Дать права", new View.OnClickListener() {
+//                        @Override
+//                        public void onClick(View view) {
+//                            openApplicationSettings();
+//                        }
+//                    }).show();
+
+
+                    Toast.makeText(this, "Зайдите в приложение еще раз или дайте права", Toast.LENGTH_LONG).show();
+
+
+                    new java.util.Timer().schedule(
+                            new java.util.TimerTask() {
+                                @Override
+                                public void run() {
+                                    finishAffinity();
+                                }
+                            },
+                            2000
+                    );
+
+
+                }
+                return;
+        }
+
+    }
+
+    private void openApplicationSettings() {
+        Intent appSettingsIntent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName()));
+
+        startActivityForResult(appSettingsIntent, PERMISSION_REQUEST_SETTINGS_CODE);
+    }
+
+    @Override
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.choose_btn:
@@ -191,10 +260,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 //check for permission
                 if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_DENIED) {
                     //ask for permission
-                    ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, READ_EXTERNAL_STORAGE_PERMISSION_CODE);
+                    ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, WRITE_EXTERNAL_STORAGE_PERMISSION_CODE);
+                } else {
+                    showFileChooser();
                 }
-
-                showFileChooser();
                 break;
             case R.id.play_iv:
                 if (mMediaPlayer.getDataSource() != null) {
@@ -217,8 +286,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     private void showFileChooser() {
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-        intent.setType("audio/*");
         intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("audio/*");
 
         try {
             startActivityForResult(
@@ -232,9 +301,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
 
+
         switch (requestCode) {
             case FILE_SELECT_CODE:
                 if (resultCode == RESULT_OK && data != null) {
+
+                    //change current playing song to first if file list was changed
+                    mCurrentPlayingSongOrder = 1;
 
                     // Gets from Intent the Uri of the selected file
                     // URI looks like - file:///storage/emulated/0/Audio/Pop/Armin%20Van%20Buuren%20-%20In%20And%20Out%20Of%20Love(feat.%20Sharon%20den%20Adel).mp3
@@ -287,6 +360,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
                     }
 
+
                 } else {
                     //DataManager.showToast("The Storage is not ready!");
                 }
@@ -332,6 +406,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
 
     private void setSongInMediaPlayer(String currentPlayingSongPath) {
+
         try {
             mMediaPlayer.setDataSource(currentPlayingSongPath);
             mMediaPlayer.prepare();
@@ -476,6 +551,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
 
     private List<Mp3File> loadFromDb() {
+
 
         List<Mp3File> list = MusicApplication.getDaoSession().queryBuilder(Mp3File.class)
                 .orderAsc(Mp3FileDao.Properties.Order)

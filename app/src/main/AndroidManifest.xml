@@ -4,6 +4,7 @@
           package="com.anray.musicapp">
 
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="com.google.android.providers.gsf.permission.READ_GSERVICES"/>
 
     <application
         android:name=".MusicApplication"

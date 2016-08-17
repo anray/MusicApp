@@ -19,6 +19,7 @@ import com.anray.musicapp.data.storage.models.Mp3File;
 import com.anray.musicapp.managers.DataManager;
 
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Created by anray on 14.08.2016.
@@ -74,7 +75,11 @@ public class FileListAdapter extends RecyclerView.Adapter<FileListAdapter.FilesL
         }
 
         DataManager.writeLog(TAG, file.getFullPath());
-        setBackgroundFromByte(file.getFullPath(), holder.mAlbumCover);
+        try {
+            setBackgroundFromByte(file.getFullPath(), holder.mAlbumCover);
+        }catch (Exception e){
+            e.printStackTrace();
+        }
 
 
         //setting highlighting to current playing item
