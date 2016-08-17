@@ -1,12 +1,16 @@
 package com.anray.musicapp.activities;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -35,6 +39,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private static final String PLAYING_STATE = "PLAYING_STATE";
     private static final String PLAYING_POSITION = "PLAYING_POSITION";
     private static final String PLAYING_SONG_ORDER = "PLAYING_SONG_ORDER";
+    private static final int READ_EXTERNAL_STORAGE_PERMISSION_CODE = 100;
 
 
     private Button mButton;
@@ -182,6 +187,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.choose_btn:
+
+                //check for permission
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_DENIED) {
+                    //ask for permission
+                    ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, READ_EXTERNAL_STORAGE_PERMISSION_CODE);
+                }
+
                 showFileChooser();
                 break;
             case R.id.play_iv:
@@ -205,7 +217,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     private void showFileChooser() {
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-        intent.setType("audio/mpeg4-generic");
+        intent.setType("audio/*");
         intent.addCategory(Intent.CATEGORY_OPENABLE);
 
         try {
@@ -219,9 +231,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+
         switch (requestCode) {
             case FILE_SELECT_CODE:
-                if (resultCode == RESULT_OK) {
+                if (resultCode == RESULT_OK && data != null) {
 
                     // Gets from Intent the Uri of the selected file
                     // URI looks like - file:///storage/emulated/0/Audio/Pop/Armin%20Van%20Buuren%20-%20In%20And%20Out%20Of%20Love(feat.%20Sharon%20den%20Adel).mp3
