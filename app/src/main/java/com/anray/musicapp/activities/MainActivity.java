@@ -57,6 +57,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        DataManager.writeLog(TAG, "onCreate");
         setContentView(R.layout.activity_main);
 
         mButton = (Button) findViewById(R.id.choose_btn);
@@ -89,8 +90,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 mCurrentPlayingSongPath = file.getFullPath();
                 updateNewCurrent(file);
 
-                showSongsList(mMp3FilesList);
-
                 setSongInMediaPlayer(mCurrentPlayingSongPath);
 
                 DataManager.writeLog("savedInstanceState is null");
@@ -107,14 +106,32 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 mMediaPlayer.seekTo(mCurrentPlayingSongPosition);
                 restorePlayingState();
 
+                DataManager.writeLog(mCurrentPlayingSongOrder);
+
             }
+
+
         }
 
+
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        DataManager.writeLog(TAG, "Start");
+        DataManager.writeLog(TAG, mCurrentPlayingSongOrder);
+
+        if (mCurrentPlayingSongOrder != 0) {
+            updateNewCurrent(loadSongByOrder(mCurrentPlayingSongOrder));
+        }
+        showSongsList(mMp3FilesList);
     }
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
+        DataManager.writeLog("onSaveInstanceState" + mCurrentPlayingSongOrder);
 
         mCurrentPlayingSongPath = mMediaPlayer.getDataSource();
         outState.putString(PLAYING_SONG_PATH, mCurrentPlayingSongPath);
@@ -126,7 +143,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         outState.putInt(PLAYING_SONG_ORDER, mCurrentPlayingSongOrder);
 
+
     }
+
 
     @Override
     protected void onPause() {
@@ -138,13 +157,25 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     protected void onStop() {
         super.onStop();
         DataManager.writeLog(TAG, "onStop");
+
+        //чтобы в базе записи не размножались
+        if (mCurrentPlayingSongOrder != 0) {
+            updateOldCurrent(mCurrentPlayingSongOrder);
+        }
+    }
+
+    @Override
+    protected void onRestart() {
+        super.onRestart();
+
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        releaseMP();
         DataManager.writeLog(TAG, "onDestroy");
+        releaseMP();
+
     }
 
     @Override
@@ -244,7 +275,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     }
 
                 } else {
-                    DataManager.showToast("The Storage is not ready!");
+                    //DataManager.showToast("The Storage is not ready!");
                 }
                 break;
         }
@@ -260,8 +291,28 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             @Override
             public void onUserPlayIconClickListener(int position) {
 
+                if (mSongsInPlaylist != 1) {
+                    int previousSongOrder = mCurrentPlayingSongOrder;
+
+
+                    mFileListAdapter.notifyItemChanged(previousSongOrder - 1);
+                    mFileListAdapter.notifyItemChanged(position);
+                    mCurrentPlayingSongOrder = position + 1;
+
+                    Mp3File file = loadSongByOrder(position + 1);
+                    updateNewCurrent(file);
+                    updateOldCurrent(previousSongOrder);
+
+                    String newFilePath = file.getFullPath();
+                    mMediaPlayer.reset();
+                    mPlayingState = 0;
+                    setSongInMediaPlayer(newFilePath);
+                    playButtonAction();
+                }
+
             }
         });
+
 
         mRecyclerView.setAdapter(mFileListAdapter);
     }
@@ -302,7 +353,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         } else {
 
-            mCurrentPlayingSongPosition = mMediaPlayer.getCurrentPosition();
+            //если вызвать паузу из остановленного состояния, то слетает и SetDataSource и prepare
             mMediaPlayer.pause();
             setPlayButtonImage();
             mPlayingState = 0;
@@ -337,6 +388,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         mFileListAdapter.notifyItemChanged(previousSongOrder - 1);
         mFileListAdapter.notifyItemChanged(mCurrentPlayingSongOrder - 1);
+
 
         Mp3File file = loadSongByOrder(mCurrentPlayingSongOrder);
         updateNewCurrent(file);

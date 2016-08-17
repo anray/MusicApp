@@ -12,6 +12,7 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.anray.musicapp.R;
 import com.anray.musicapp.data.storage.models.Mp3File;
@@ -76,11 +77,15 @@ public class FileListAdapter extends RecyclerView.Adapter<FileListAdapter.FilesL
         setBackgroundFromByte(file.getFullPath(), holder.mAlbumCover);
 
 
+        //setting highlighting to current playing item
         if (file.getPlayingFlag() == 1) {
             holder.mRelativeLayout.setBackgroundColor(mContext.getResources().getColor(R.color.yellow));
+            holder.mPlay.setImageDrawable(mContext.getResources().getDrawable(R.drawable.pause_circle_outline));
         } else {
             holder.mRelativeLayout.setBackgroundColor(0);
+            holder.mPlay.setImageDrawable(mContext.getResources().getDrawable(R.drawable.play_circle_outline));
         }
+
 
 
     }
@@ -140,22 +145,25 @@ public class FileListAdapter extends RecyclerView.Adapter<FileListAdapter.FilesL
             mAlbumCover = (ImageView) itemView.findViewById(R.id.album_thumb);
             mPlay = (ImageView) itemView.findViewById(R.id.play_icon_iv);
 
-            mPlay.setOnClickListener(this);
+            mRelativeLayout.setOnClickListener(this);
 
         }
 
         @Override
         public void onClick(View v) {
             if (mListener != null) {
-                switch (v.getId()) {
-                    case R.id.play_icon_iv:
+//                switch (v.getId()) {
+//                    case R.id.play_icon_iv:
                         mListener.onUserPlayIconClickListener(getAdapterPosition());
-                        break;
+                        DataManager.writeLog("Clicked");
+//                        break;
+//                }
 
-                }
 
             }
+
         }
+
 
         public interface CustomClickListener {
 
